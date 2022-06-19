@@ -6,21 +6,15 @@ num = int | float
 
 @dataclass
 class Point:
-    x: num | None
-    y: num | None
-
-
-def resolve_coord(val: int | tuple[num, num] | None) -> Point:
-    match val:
-        case int(x):
-            return Point(0, x)
-        case (x, y):
-            return Point(x, y)
-        case None:
-            return Point(None, None)
+    x: num
+    y: num
 
 
 class Matrix:
+    @staticmethod
+    def _to_matrix(m: typing.Union["Matrix", list[list[num]]]) -> "Matrix":
+        return m if isinstance(m, Matrix) else Matrix(m)
+
     def __init__(
         self, data: list[list[num]] | None = None, n: int | None = None
     ) -> None:
@@ -36,6 +30,15 @@ class Matrix:
             else:
                 self._n = n
                 self._data = []
+
+    def resolve_coord(self, val: int | tuple[num, num] | None) -> Point:
+        match val:
+            case int(x):
+                return Point(0, x)
+            case (x, y):
+                return Point(x, y)
+            case None:
+                return Point(self.n - 1, self.m - 1)
 
     def all_except(self, p: Point) -> "Matrix":
         return Matrix(
@@ -73,7 +76,7 @@ class Matrix:
         if self.m == 1:
             return self._data[0][0]
         return sum(
-            ((-1) ** x) * self[(x, 0)] * self.all_except(Point(x, 0)).determinant
+            ((-1) ** x) * self.get((x, 0)) * self.all_except(Point(x, 0)).determinant
             for x in range(self.n)
         )
 
@@ -107,6 +110,25 @@ class Matrix:
     def inverse(self) -> "Matrix":
         return self.adjoint / self.determinant
 
+    @staticmethod
+    def cramers_linear_solve(a: "Matrix", b: "Matrix") -> "Matrix":
+        d = a.determinant
+        ds: list[Matrix] = []
+        for i in range(a.n):
+            m = a.copy()
+            m[(i, 0) : (i + 1, a.m)] = b
+            ds.append(m)
+        return Matrix([[i.determinant / d for i in ds]]).transpose
+
+    def get(self, coord: tuple[int, int]) -> num:
+        return self._data[coord[1]][coord[0]]
+    
+    def get_row(self, m: int) -> list[num]:
+        return self._data[m]
+
+    def copy(self) -> "Matrix":
+        return Matrix([i.copy() for i in self._data])
+
     def __mul__(self, other: num) -> "Matrix":
         return Matrix([[other * i for i in j] for j in self._data])
 
@@ -117,23 +139,37 @@ class Matrix:
         return "\n".join(" ".join(str(j) for j in i) for i in self._data)
 
     def __getitem__(
-        self, val: slice | int | tuple[int, int]
-    ) -> typing.Union["Matrix", num]:
-        match val:
-            case (x, y):
-                return self._data[y][x]
-            case int(index):
-                return Matrix([self._data[index]])
-            case slice() as s:
-                start, end = resolve_coord(s.start), resolve_coord(s.stop)
-                return Matrix([i[start.x : end.x] for i in self._data[start.y : end.y]])
+        self, val: slice 
+    ) -> "Matrix":
+        start, end = self.resolve_coord(val.start), self.resolve_coord(val.stop)
+        return Matrix([i[start.x : end.x] for i in self._data[start.y : end.y]])
+
+    def __setitem__(
+        self, key: slice, value: typing.Union["Matrix", list[list[num]]]
+    ) -> None:
+        matrix = Matrix._to_matrix(value)
+        start, stop = self.resolve_coord(key.start), self.resolve_coord(key.stop)
+        width, height = stop.x - start.x, stop.y - start.y
+        if matrix.n == width and matrix.m == height:
+            for j in range(matrix.m):
+                for i in range(matrix.n):
+                    self._data[int(start.y) + j][int(start.x) + i] = matrix.get((i, j))
+        else:
+            raise ValueError("Cannot set value of unequal dimensions")
 
 
-x = Matrix(
-    [
-        [1, 2],
-        [1, 5],
-    ]
-)
+if __name__ == "__main__":
+    x = Matrix(
+        [
+            [1, 2, 3],
+            [1, 5, 5],
+        ]
+    )
 
-print(x.inverse)
+    x[(1, 0):] = Matrix(
+        [
+            [4, 4],
+            [5, 5],
+        ]
+    )
+    print(x)

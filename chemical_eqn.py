@@ -19,7 +19,7 @@ def get_closing_bracket(b: str) -> str | None:
 
 
 def coef_convert(v: int, n: int = 1) -> str:
-    return str(v) if v > n else ""
+    return str(v) if v != n else ""
 
 
 def subscript_coef_convert(v: int, n: int = 1) -> str:
@@ -74,6 +74,11 @@ class Group:
         lexer = GroupLexer(s)
         return lexer.get_group()
 
+    def __eq__(self, o: object) -> bool:
+        return (
+            isinstance(o, Group) and o.children == self.children and o.coef == self.coef
+        )
+
     def __str__(self) -> str:
         s = "".join(str(i) for i in self.children)
         return (
@@ -86,22 +91,48 @@ class Group:
         return self.__str__()
 
 
-@dataclass
-class ChemEquation:
-    lhs: list[Group]
-    rhs: list[Group]
+def _switcheroo(l: list[Group], r: list[Group], is_l: bool) -> list[Group]:
+    return [
+        *(i for i in (l if is_l else r) if i.coef > 0),
+        *(
+            Group(-i.coef, i.children, i.is_sub)
+            for i in (r if is_l else l)
+            if i.coef < 0
+        ),
+    ]
 
-    def atom_count_mapping(self, is_left: bool) -> dict[str, int]:
+
+class ChemEquation:
+    def __init__(self, lhs: list[Group], rhs: list[Group]) -> None:
+        if lhs and rhs:
+            # the old switcheroo
+            self.lhs = _switcheroo(lhs, rhs, True)
+            self.rhs = _switcheroo(lhs, rhs, False)
+
+        else:
+            raise ValueError("Both sides of the equation must not be empty")
+
+    def atom_count_mapping(self) -> dict[str, int]:
+        return Counter(self._atom_count_mapping(False)) + Counter(
+            self._atom_count_mapping(True)
+        )
+
+    def _atom_count_mapping(self, is_left: bool) -> dict[str, int]:
+        """Returns a dict mapping every atom type to its number"""
         return reduce(
             lambda x, y: x + Counter(y),
             (i.atom_count_mapping for i in (self.lhs if is_left else self.rhs)),
             Counter[str](),
         )
-    
+
+    @property
+    def atom_count(self) -> int:
+        return len(self.atom_count_mapping())
+
     @property
     def is_balanced(self) -> bool:
-        '''Returns `True` if the chemical equation is balanced otherwise `False`'''
-        return self.atom_count_mapping(True) == self.atom_count_mapping(False)
+        """Returns `True` if the chemical equation is balanced otherwise `False`"""
+        return self._atom_count_mapping(True) == self._atom_count_mapping(False)
 
     @staticmethod
     def parse(s: str) -> "ChemEquation":
@@ -167,19 +198,17 @@ class GroupLexer:
             if (closing_bracket := get_closing_bracket(c)) is not None:
                 sub_group_text = self.consume_while(lambda _, ch: ch != closing_bracket)
                 self.consume()  # consume closing bracket
-                lexer = GroupLexer(sub_group_text)
-                sub_group = lexer.get_group()
+
+                sub_group = GroupLexer(sub_group_text).get_group()
                 sub_group.coef = self.consume_coef()
                 sub_group.is_sub = True
+
                 elems.append(sub_group)
 
         return Group(coef, elems)
 
 
-while True:
-    eqn = ChemEquation.parse(input("> "))
-    print()
-    print(
-        f"LHS\n{eqn.atom_count_mapping(True)}\n\nRHS\n{eqn.atom_count_mapping(False)}"
-    )
-    print(f"This equation is{' not' if not eqn.is_balanced else ''} balanced")
+if __name__ == "__main__":
+    while True:
+        eqn = ChemEquation.parse(input("> "))
+        print(f"This equation is{' not' if not eqn.is_balanced else ''} balanced")
