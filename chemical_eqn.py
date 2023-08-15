@@ -18,16 +18,20 @@ def get_closing_bracket(b: str) -> str | None:
     }.get(b)
 
 
-def coef_convert(v: int, n: int = 1) -> str:
-    return str(v) if v != n else ""
+def coef_convert(v: int) -> str:
+    # we dont need any coefficient for single atoms
+    return str(v) if v != 1 else ""
 
 
-def subscript_coef_convert(v: int, n: int = 1) -> str:
-    return get_subscript(v) if v > n else ""
+def subscript_coef_convert(v: int) -> str:
+    # we dont need to show any subscript for single atoms
+    return get_subscript(v) if v > 1 else ""
 
 
 @dataclass
 class ElementGroup:
+    """Class for representing monoatomic or polyatomic molecules"""
+
     coef: int
     atom: str
 
@@ -39,6 +43,8 @@ class ElementGroup:
 
 
 class Group:
+    """Class for representing compounds"""
+
     def __init__(
         self,
         coef: int,
@@ -61,6 +67,7 @@ class Group:
                 case ElementGroup() as g:
                     counter[g.atom] += g.coef
                 case Group() as g:
+                    # adds the count of the atoms of `g`
                     counter.update(g.atom_count_mapping)
         return {atom: self.coef * coef for atom, coef in counter.items()}
 
@@ -92,6 +99,7 @@ class Group:
 
 
 def _switcheroo(l: list[Group], r: list[Group], is_l: bool) -> list[Group]:
+    """Used to switch """
     return [
         *(i for i in (l if is_l else r) if i.coef > 0),
         *(

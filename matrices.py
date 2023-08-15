@@ -6,8 +6,8 @@ num = int | float
 
 @dataclass
 class Point:
-    x: num
-    y: num
+    x: int
+    y: int
 
 
 class Matrix:
@@ -31,7 +31,7 @@ class Matrix:
                 self._n = n
                 self._data = []
 
-    def resolve_coord(self, val: int | tuple[num, num] | None) -> Point:
+    def resolve_coord(self, val: int | tuple[int, int] | None) -> Point:
         match val:
             case int(x):
                 return Point(0, x)
@@ -53,11 +53,8 @@ class Matrix:
         return self.all_except(p).determinant
 
     def cofactor(self, p: Point) -> num:
-        x, y = int(p.x or 0), int(p.y or 0)  # strict type checking moment
-        if x is not None and y is not None:
-            return ((-1) ** (x + y)) * self.minor(Point(x, y))
-        else:
-            raise ValueError("no None coords")
+        x, y = int(p.x), int(p.y)  # strict type checking moment
+        return ((-1) ** int(p.x + p.y)) * self.minor(Point(x, y))
 
     @property
     def m(self) -> int:
@@ -68,7 +65,7 @@ class Matrix:
         return len(self._data[0]) if self._data else self._n
 
     @property
-    def determinant(self) -> num:
+    def determinant(self) -> float:
         if self.m != self.n:
             raise ValueError(
                 "Determinants can only be calculated with square matrices (m=n)"
@@ -112,13 +109,19 @@ class Matrix:
 
     @staticmethod
     def cramers_linear_solve(a: "Matrix", b: "Matrix") -> "Matrix":
+        """
+        Uses Cramer's rule to solve a linear system of equations
+
+        `AX + B = 0` where A, B, and X are matrices and X is the unknown matrix
+        """
         d = a.determinant
-        ds: list[Matrix] = []
+        ds: list[float] = [] # [ Dx, Dy, ... ]
         for i in range(a.n):
             m = a.copy()
+            # replacing `i`th column of A with B to calculate Dx
             m[(i, 0) : (i + 1, a.m)] = b
-            ds.append(m)
-        return Matrix([[i.determinant / d for i in ds]]).transpose
+            ds.append(m.determinant)
+        return Matrix([[i / d for i in ds]]).transpose
 
     def get(self, coord: tuple[int, int]) -> num:
         return self._data[coord[1]][coord[0]]
